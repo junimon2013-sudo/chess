@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Nocturne Chess</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg-panel: #151515;
+    --bg-panel-2: #1c1c1c;
+    --line: #2a2a2a;
+    --text: #ece7de;
+    --text-dim: #8a8578;
+    --accent: #c9a24b; /* muted gold */
+    --accent-dim: #8a7233;
+    --board-light: #e8e2d0;
+    --board-dark: #3d3527;
+    --board-light-hi: #f0e68c;
+    --board-dark-hi: #b8a83f;
+    --white-piece: #f5f2ea;
+    --white-piece-shadow: #b8b2a0;
+    --black-piece: #1a1a1a;
+    --black-piece-shadow: #000;
+    --danger: #b8564a;
+    --success: #6a9a5f;
+    --radius: 6px;
+    --serif: 'Cormorant Garamond', Georgia, 'Nanum Myeongjo', serif;
+    --sans: 'Pretendard', -apple-system, 'Malgun Gothic', sans-serif;
+    --mono: 'JetBrains Mono', 'D2Coding', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    width: 100%; height: 100%;
+    overflow-x: hidden;
+  }
+  #app { min-height: 100vh; display: flex; flex-direction: column; }
+
+  ::selection { background: var(--accent-dim); color: #fff; }
+
+  /* ---------- Screen management ---------- */
+  .screen {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+    position: relative;
+    animation: fadeIn 0.35s ease;
+  }
+  .screen.active { display: flex; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- Back button (every screen except home) ---------- */
+  .back-btn {
+    position: absolute;
+    top: 20px; left: 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    padding: 9px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.15s ease;
+    z-index: 50;
+  }
+  .back-btn:hover { color: var(--text); border-color: var(--accent-dim); background: var(--bg-panel-2); }
+  .back-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Home screen ---------- */
+  #screen-home { gap: 8px; }
+  .logo-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    margin-bottom: 44px;
+  }
+  .logo-piece {
+    width: 108px; height: 108px;
+    margin-bottom: 18px;
+    filter: drop-shadow(0 0 22px rgba(201,162,75,0.25));
+  }
+  .brand-title {
+    font-family: var(--serif);
+    font-size: 44px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    margin: 0;
+  }
+  .brand-sub {
+    font-family: var(--sans);
+    font-size: 12px;
+    letter-spacing: 0.35em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .home-actions { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+
+  .dropdown-wrap { position: relative; }
+  .btn-main {
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--accent-dim);
+    padding: 16px 56px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+  .btn-main:hover, .dropdown-wrap:hover .btn-main {
+    background: rgba(201,162,75,0.08);
+    border-color: var(--accent);
+    box-shadow: 0 0 24px rgba(201,162,75,0.12);
+  }
+  .btn-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-6px);
+    min-width: 100%;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 40;
+  }
+  .dropdown-wrap:hover .dropdown-menu,
+  .dropdown-wrap:focus-within .dropdown-menu {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
+  .dropdown-item {
+    padding: 14px 20px;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    cursor: pointer;
+    white-space: nowrap;
+    text-align: center;
+    border-bottom: 1px solid var(--line);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .dropdown-item:last-child { border-bottom: none; }
+  .dropdown-item:hover { background: var(--bg-panel-2); color: var(--accent); }
+
+  .btn-secondary {
+    font-family: var(--sans);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid var(--line);
+    padding: 10px 28px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+
+  .settings-icon-btn {
+    position: absolute;
+    bottom: 24px; right: 24px;
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .settings-icon-btn:hover { color: var(--accent); border-color: var(--accent-dim); background: var(--bg-panel-2); }
+  .settings-icon-btn svg { width: 22px; height: 22px; }
+
+  .settings-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 200;
+  }
+  .settings-overlay.active { display: flex; }
+  .settings-popup {
+    background: var(--bg-panel);
+    border: 1px solid var(--accent-dim);
+    border-radius: 10px;
+    width: 340px;
+    padding: 24px;
+    position: relative;
+  }
+  .settings-popup-title {
+    font-family: var(--serif);
+    font-size: 20px;
+    margin: 0 0 20px 0;
+  }
+  .settings-close-btn {
+    position: absolute;
+    top: 14px; right: 14px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    transition: all 0.15s ease;
+  }
+  .settings-close-btn:hover { color: var(--text); border-color: var(--accent-dim); }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row-label { font-size: 14px; color: var(--text); }
+  .settings-row-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .switch {
+    width: 40px; height: 22px;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .switch .knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: all 0.2s ease;
+  }
+  .switch.on { border-color: var(--accent-dim); }
+  .switch.on .knob { left: 20px; background: var(--accent); }
+
+  .toast-popup {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-panel);
+    border: 1px solid var(--accent-dim);
+    border-radius: 10px;
+    padding: 22px 36px;
+    font-family: var(--serif);
+    font-size: 18px;
+    color: var(--text);
+    z-index: 300;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .toast-popup.active { opacity: 1; }
+
+  /* ---------- Generic panel/card ---------- */
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 32px;
+  }
+  .page-title {
+    font-family: var(--serif);
+    font-size: 28px;
+    color: var(--text);
+    margin: 0 0 6px 0;
+    text-align: center;
+  }
+  .page-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  /* ---------- Online menu ---------- */
+  .menu-grid { display: flex; flex-direction: column; gap: 12px; width: 320px; }
+  .menu-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+  }
+  .menu-card:hover { border-color: var(--accent-dim); background: var(--bg-panel-2); transform: translateX(2px); }
+  .menu-card-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .menu-card-desc { font-size: 12px; color: var(--text-dim); }
+
+  /* ---------- Room code ---------- */
+  .room-code-display {
+    font-family: var(--mono);
+    font-size: 42px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-align: center;
+    padding: 24px 32px;
+    background: var(--bg-panel-2);
+    border: 1px dashed var(--accent-dim);
+    border-radius: var(--radius);
+    margin: 20px 0;
+    user-select: all;
+  }
+  .waiting-dots::after {
+    content: '';
+    animation: dots 1.4s infinite steps(4);
+  }
+  @keyframes dots {
+    0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; }
+  }
+  .code-input {
+    font-family: var(--mono);
+    font-size: 28px;
+    letter-spacing: 0.2em;
+    text-align: center;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 14px;
+    border-radius: var(--radius);
+    width: 260px;
+    text-transform: uppercase;
+  }
+  .code-input:focus-visible { outline: 2px solid var(--accent); border-color: var(--accent); }
+
+  .form-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+  .form-row label { font-size: 12px; color: var(--text-dim); letter-spacing: 0.04em; }
+  .time-options { display: flex; gap: 8px; flex-wrap: wrap; }
+  .time-chip {
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .time-chip:hover { border-color: var(--accent-dim); }
+  .time-chip.selected { border-color: var(--accent); color: var(--accent); background: rgba(201,162,75,0.08); }
+  .custom-time-inputs { display: flex; gap: 10px; align-items: center; }
+  .custom-time-inputs input {
+    width: 70px; background: var(--bg-panel-2); border: 1px solid var(--line);
+    color: var(--text); padding: 8px; border-radius: var(--radius); font-family: var(--mono);
+    text-align: center;
+  }
+
+  .status-line { text-align: center; font-size: 13px; color: var(--text-dim); margin-top: 12px; min-height: 18px; }
+  .status-line.error { color: var(--danger); }
+  .status-line.success { color: var(--success); }
+
+  /* ---------- Opening browser ---------- */
+  #screen-openings { align-items: stretch; justify-content: flex-start; padding-top: 76px; }
+  .opening-layout {
+    display: flex;
+    gap: 24px;
+    width: 100%;
+    max-width: 980px;
+    margin: 0 auto;
+    align-items: stretch;
+  }
+  .opening-left {
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .opening-root-tabs { display: flex; gap: 8px; }
+  .opening-root-tab {
+    flex: 1;
+    font-family: var(--serif);
+    font-size: 17px;
+    padding: 12px;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--text);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+  }
+  .opening-root-tab:hover { border-color: var(--accent-dim); }
+  .opening-root-tab.selected { border-color: var(--accent); color: var(--accent); background: rgba(201,162,75,0.08); }
+
+  .opening-list-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .opening-list-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); padding: 6px 8px 10px; }
+  .opening-node-item {
+    padding: 11px 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .opening-node-item:hover { background: var(--bg-panel-2); color: var(--text); }
+  .opening-node-item.active { background: rgba(201,162,75,0.14); color: var(--accent); }
+  .opening-node-item .sub-count { font-size: 11px; color: var(--text-dim); margin-left: 6px; }
+
+  .opening-info-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .opening-info-name { font-family: var(--serif); font-size: 17px; color: var(--accent); margin-bottom: 8px; }
+  .opening-info-desc { font-size: 13px; color: var(--text-dim); line-height: 1.6; flex: 1; }
+  .opening-back-row { margin-top: 14px; }
+  .opening-back-arrow-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s ease;
+  }
+  .opening-back-arrow-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .opening-back-arrow-btn:disabled { opacity: 0.25; cursor: default; }
+
+  .opening-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .opening-right-title { font-family: var(--serif); font-size: 15px; color: var(--text-dim); margin-bottom: 14px; text-align: center; min-height: 20px; }
+  #opening-board-wrap { position: relative; width: 400px; height: 400px; }
+  #opening-board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    width: 400px; height: 400px;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 10px 32px rgba(0,0,0,0.5);
+  }
+  #opening-arrow-layer { position: absolute; top: 0; left: 0; width: 400px; height: 400px; pointer-events: none; }
+
+  @media (max-width: 900px) {
+    .opening-layout { flex-direction: column; }
+    .opening-left { width: 100%; }
+    #opening-board-wrap, #opening-board, #opening-arrow-layer { width: 90vw; height: 90vw; max-width: 400px; max-height: 400px; }
+  }
+
+  /* ---------- Game screen ---------- */
+  #screen-game { justify-content: flex-start; padding-top: 16px; }
+  .game-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    justify-content: center;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .board-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .player-tag {
+    display: flex; align-items: center; justify-content: space-between;
+    width: var(--board-size, 560px);
+    font-size: 13px;
+    color: var(--text-dim);
+    padding: 4px 2px;
+  }
+  .player-tag .name { display: flex; align-items: center; gap: 8px; }
+  .player-tag .clock {
+    font-family: var(--mono);
+    font-size: 20px;
+    padding: 6px 14px;
+    border-radius: 4px;
+    background: var(--bg-panel-2);
+    color: var(--text);
+    letter-spacing: 0.05em;
+    min-width: 84px;
+    text-align: center;
+  }
+  .player-tag .clock.active { color: var(--accent); box-shadow: 0 0 0 1px var(--accent-dim); }
+  .player-tag .clock.low { color: var(--danger); }
+  .captured-row { font-size: 18px; min-height: 22px; color: var(--text-dim); letter-spacing: 2px; }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    width: var(--board-size, 560px);
+    height: var(--board-size, 560px);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+    border: 1px solid #000;
+    position: relative;
+  }
+  .square { position: relative; display: flex; align-items: center; justify-content: center; user-select: none; }
+  .square.light { background: var(--board-light); }
+  .square.dark { background: var(--board-dark); }
+  .square.highlight-select { box-shadow: inset 0 0 0 4px rgba(201,162,75,0.75); }
+  .square.highlight-lastmove { background-image: linear-gradient(rgba(201,162,75,0.35), rgba(201,162,75,0.35)); }
+  .square.highlight-check { background-image: radial-gradient(circle, rgba(184,86,74,0.85) 0%, rgba(184,86,74,0.15) 70%); }
+  .square.highlight-premove { box-shadow: inset 0 0 0 4px rgba(106,154,95,0.65); }
+  .square.annot-square { background-image: linear-gradient(rgba(184,86,74,0.55), rgba(184,86,74,0.55)); }
+  .square .move-dot {
+    width: 22%; height: 22%; border-radius: 50%;
+    background: rgba(30,30,30,0.35);
+    position: absolute;
+    pointer-events: none;
+  }
+  .square .capture-ring {
+    position: absolute; inset: 6%; border-radius: 50%;
+    box-shadow: inset 0 0 0 5px rgba(30,30,30,0.35);
+    pointer-events: none;
+  }
+  .square .coord-file, .square .coord-rank {
+    position: absolute; font-size: 10px; font-weight: 700; pointer-events: none; opacity: 0.55;
+  }
+  .square .coord-file { bottom: 2px; right: 4px; }
+  .square .coord-rank { top: 2px; left: 4px; }
+  .square.light .coord-file, .square.light .coord-rank { color: var(--board-dark); }
+  .square.dark .coord-file, .square.dark .coord-rank { color: var(--board-light); }
+
+  .piece {
+    width: 88%; height: 88%;
+    cursor: grab;
+    display: flex; align-items: center; justify-content: center;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35));
+    transition: transform 0.06s ease;
+  }
+  .piece:active { cursor: grabbing; }
+  .piece.dragging { opacity: 0.35; }
+  .piece svg { width: 100%; height: 100%; }
+
+  .promo-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 30;
+  }
+  .promo-box {
+    display: flex; gap: 10px; background: var(--bg-panel); padding: 16px; border-radius: 8px; border: 1px solid var(--accent-dim);
+  }
+  .promo-choice {
+    width: 64px; height: 64px; background: var(--bg-panel-2); border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.15s ease;
+  }
+  .promo-choice:hover { background: rgba(201,162,75,0.15); }
+
+  /* ---------- Notation / side panel ---------- */
+  .side-panel {
+    width: 300px;
+    display: flex; flex-direction: column;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    height: 640px;
+  }
+  .side-panel-title {
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim);
+    margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
+  }
+  .moves-scroll { flex: 1; overflow-y: auto; }
+  .move-row { display: grid; grid-template-columns: 34px 1fr 1fr; gap: 6px; font-family: var(--mono); font-size: 14px; padding: 5px 4px; border-radius: 4px; }
+  .move-row:nth-child(odd) { background: rgba(255,255,255,0.02); }
+  .move-row .num { color: var(--text-dim); }
+  .move-row .san { cursor: pointer; color: var(--text); padding: 2px 4px; border-radius: 3px; }
+  .move-row .san:hover { background: var(--bg-panel-2); }
+  .move-row .san.current { background: rgba(201,162,75,0.18); color: var(--accent); }
+
+  .game-controls { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .game-controls button {
+    flex: 1;
+    min-width: 80px;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    padding: 9px 10px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .game-controls button:hover { color: var(--text); border-color: var(--accent-dim); }
+
+  .result-banner {
+    margin-top: 14px;
+    padding: 14px;
+    text-align: center;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--accent-dim);
+    border-radius: var(--radius);
+    font-family: var(--serif);
+    font-size: 18px;
+    color: var(--accent);
+  }
+
+  @media (max-width: 980px) {
+    .game-layout { flex-direction: column; align-items: center; }
+    .side-panel { width: var(--board-size, 92vw); height: 260px; }
+    :root { --board-size: 92vw; }
+  }
+  @media (max-width: 600px) {
+    :root { --board-size: 94vw; }
+  }
+
+  a { color: var(--accent); }
+  button { font-family: inherit; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ HOME ============ -->
+  <div class="screen active" id="screen-home">
+    <div class="logo-wrap">
+      <svg class="logo-piece" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="#c9a24b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M50 12c-5 0-9 4-9 9 0 3 1.5 5.5 3.7 7.2L41 34h18l-3.7-5.8C57.5 26.5 59 24 59 21c0-5-4-9-9-9z"/>
+          <path d="M38 34h24l3 12H35l3-12z"/>
+          <path d="M32 46h36l4 10c1 3-1 6-4 6H32c-3 0-5-3-4-6l4-10z"/>
+          <path d="M26 62h48v8c0 3-2 5-5 5H31c-3 0-5-2-5-5v-8z"/>
+          <path d="M22 75h56l3 10H19l3-10z"/>
+        </g>
+      </svg>
+      <h1 class="brand-title">Nocturne Chess</h1>
+      <div class="brand-sub">All 64 squares, after dark</div>
+    </div>
+
+    <div class="home-actions">
+      <div class="dropdown-wrap" tabindex="0">
+        <button class="btn-main">Play</button>
+        <div class="dropdown-menu">
+          <div class="dropdown-item" id="menu-online">온라인</div>
+          <div class="dropdown-item" id="menu-offline">오프라인</div>
+        </div>
+      </div>
+      <button class="btn-secondary" id="btn-openings">오프닝</button>
+      <button class="btn-secondary" id="btn-puzzles">퍼즐</button>
+    </div>
+
+    <button class="settings-icon-btn" id="btn-settings" aria-label="설정">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ============ SETTINGS POPUP ============ -->
+  <div class="settings-overlay" id="settings-overlay">
+    <div class="settings-popup">
+      <button class="settings-close-btn" id="settings-close-btn">✕</button>
+      <h3 class="settings-popup-title">설정</h3>
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-label">프리무브</div>
+          <div class="settings-row-desc">온라인 대전에서 상대 차례에 다음 수 미리 지정</div>
+        </div>
+        <div class="switch" id="setting-premove"><div class="knob"></div></div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-label">무조건 퀸으로 승진</div>
+          <div class="settings-row-desc">프로모션 선택 없이 자동으로 퀸</div>
+        </div>
+        <div class="switch" id="setting-auto-queen"><div class="knob"></div></div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-label">방향 표시</div>
+          <div class="settings-row-desc">우클릭 드래그로 화살표, 우클릭으로 칸 표시</div>
+        </div>
+        <div class="switch on" id="setting-annotations"><div class="knob"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-popup" id="toast-popup"></div>
+
+  <!-- ============ ONLINE MENU ============ -->
+  <div class="screen" id="screen-online-menu">
+    <button class="back-btn" data-back="screen-home">← 뒤로</button>
+    <h2 class="page-title">온라인 대전</h2>
+    <div class="page-sub">10분 + 10초 추가시간 · 상대와 실시간 대국</div>
+    <div class="menu-grid">
+      <div class="menu-card" id="card-create-room">
+        <div class="menu-card-title">방 만들기</div>
+        <div class="menu-card-desc">방 코드를 생성하고 상대를 기다립니다</div>
+      </div>
+      <div class="menu-card" id="card-join-room">
+        <div class="menu-card-title">방 참가하기</div>
+        <div class="menu-card-desc">전달받은 코드를 입력해 접속합니다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CREATE ROOM ============ -->
+  <div class="screen" id="screen-create-room">
+    <button class="back-btn" data-back="screen-online-menu">← 뒤로</button>
+    <h2 class="page-title">방 만들기</h2>
+    <div class="page-sub">아래 코드를 상대에게 전달하세요</div>
+    <div class="room-code-display" id="room-code-text">------</div>
+    <div class="status-line" id="create-room-status">상대를 기다리는 중<span class="waiting-dots"></span></div>
+    <button class="btn-secondary" id="btn-copy-code" style="margin-top:14px;">코드 복사</button>
+  </div>
+
+  <!-- ============ JOIN ROOM ============ -->
+  <div class="screen" id="screen-join-room">
+    <button class="back-btn" data-back="screen-online-menu">← 뒤로</button>
+    <h2 class="page-title">방 참가하기</h2>
+    <div class="page-sub">전달받은 방 코드를 입력하세요</div>
+    <input class="code-input" id="join-code-input" maxlength="8" placeholder="ABC123" autocomplete="off">
+    <button class="btn-main" style="margin-top:18px; padding:12px 40px; font-size:14px;" id="btn-join-submit">접속하기</button>
+    <div class="status-line" id="join-room-status"></div>
+  </div>
+
+  <!-- ============ OFFLINE TIME SELECT ============ -->
+  <div class="screen" id="screen-offline-setup">
+    <button class="back-btn" data-back="screen-home">← 뒤로</button>
+    <h2 class="page-title">오프라인 대전</h2>
+    <div class="page-sub">같은 화면에서 번갈아 두는 로컬 2인 대전</div>
+    <div class="panel" style="width:360px;">
+      <div class="form-row">
+        <label>기본 시간</label>
+        <div class="time-options" id="offline-time-base">
+          <div class="time-chip" data-v="3">3분</div>
+          <div class="time-chip" data-v="5">5분</div>
+          <div class="time-chip selected" data-v="10">10분</div>
+          <div class="time-chip" data-v="15">15분</div>
+          <div class="time-chip" data-v="30">30분</div>
+          <div class="time-chip" data-v="0">무제한</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>추가 시간 (초/수)</label>
+        <div class="time-options" id="offline-time-inc">
+          <div class="time-chip selected" data-v="0">0초</div>
+          <div class="time-chip" data-v="2">2초</div>
+          <div class="time-chip" data-v="5">5초</div>
+          <div class="time-chip" data-v="10">10초</div>
+        </div>
+      </div>
+      <button class="btn-main" style="width:100%; margin-top:10px;" id="btn-offline-start">대국 시작</button>
+    </div>
+  </div>
+
+  <!-- ============ OPENINGS ============ -->
+  <div class="screen" id="screen-openings">
+    <button class="back-btn" data-back="screen-home">← 뒤로</button>
+    <div class="opening-layout">
+      <div class="opening-left">
+        <div class="opening-root-tabs">
+          <div class="opening-root-tab selected" data-root="e4">1. E4</div>
+          <div class="opening-root-tab" data-root="d4">1. D4</div>
+        </div>
+        <div class="opening-list-panel">
+          <div class="opening-list-title">오프닝 이름과 바리에이션</div>
+          <div id="opening-node-list"></div>
+        </div>
+        <div class="opening-info-panel">
+          <div class="opening-info-name" id="opening-info-name"></div>
+          <div class="opening-info-desc" id="opening-info-desc"></div>
+          <div class="opening-back-row">
+            <button class="opening-back-arrow-btn" id="opening-back-btn" aria-label="이전 단계로" disabled>◀</button>
+          </div>
+        </div>
+      </div>
+      <div class="opening-right">
+        <div class="opening-right-title" id="opening-right-title"></div>
+        <div id="opening-board-wrap">
+          <div id="opening-board"></div>
+          <svg id="opening-arrow-layer" viewBox="0 0 400 400"></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="screen-game">
+    <button class="back-btn" id="game-back-btn">← 뒤로</button>
+    <div class="game-layout">
+      <div class="board-col">
+        <div class="player-tag" id="tag-top">
+          <span class="name" id="name-top">상대</span>
+          <span class="captured-row" id="captured-top"></span>
+          <span class="clock" id="clock-top">10:00</span>
+        </div>
+        <div id="board"></div>
+        <div class="player-tag" id="tag-bottom">
+          <span class="name" id="name-bottom">나</span>
+          <span class="captured-row" id="captured-bottom"></span>
+          <span class="clock" id="clock-bottom">10:00</span>
+        </div>
+      </div>
+      <div class="side-panel">
+        <div class="side-panel-title">기보</div>
+        <div class="moves-scroll" id="moves-scroll"></div>
+        <div id="result-banner-slot"></div>
+        <div class="game-controls">
+          <button id="btn-resign">기권</button>
+          <button id="btn-draw-offer">무승부 제안</button>
+          <button id="btn-flip">보드 뒤집기</button>
+          <button id="btn-copy-pgn">기보 복사</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<script src="engine.js"></script>
+<script src="pieces.js"></script>
+<script src="opening-tree.js"></script>
+<script src="peer-online.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
